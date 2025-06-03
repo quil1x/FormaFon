@@ -1,0 +1,39 @@
+name: Deploy Flutter Web to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # <--- ЗАЗНАЧ ТУТ НАЗВУ ТВОЄЇ ОСНОВНОЇ ГІЛКИ (main або master)
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Дозвіл на запис, щоб створити/оновити гілку gh-pages
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4 # Бере твій код з репозиторію
+
+      - name: Setup Flutter 🐦
+        uses: subosito/flutter-action@v2 # Налаштовує Flutter
+        with:
+          channel: 'stable' # Або 'beta', 'dev', залежно від твоїх потреб
+
+      - name: Install dependencies 📦
+        run: flutter pub get # Встановлює залежності з pubspec.yaml
+
+      - name: Build web app 🏗️
+        # !!!!! ДУЖЕ ВАЖЛИВО !!!!!
+        # ЗАМІНИ "/myportfolio/" на ТОЧНУ НАЗВУ ТВОГО РЕПОЗИТОРІЮ на GitHub!
+        # Наприклад, якщо твій репозиторій називається "FormaFon-Lviv-App", то буде "/FormaFon-Lviv-App/"
+        run: flutter build web --release --base-href /FormaFon/ # <--- ЗМІНИ ЦЕЙ РЯДОК!
+
+      - name: Deploy to GitHub Pages 🚀
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # Спеціальний токен для доступу
+          publish_dir: ./build/web # Папка, яку публікуємо (звідси береться готовий сайт)
+          # За замовчуванням публікує у гілку gh-pages
+          publish_branch: gh-pages # <--- Явно вказуємо гілку gh-pages
+          # force_orphan: true # Можна розкоментувати, якщо хочеш примусово перезаписувати історію gh-pages
