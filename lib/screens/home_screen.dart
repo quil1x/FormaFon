@@ -1,9 +1,11 @@
 // lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/configurator_provider.dart';
-import './configurator_screen.dart';
-import './summary_screen.dart'; // Цей імпорт важливий для SummaryScreen
+import '../providers/settings_provider.dart';
+import 'configurator_screen.dart';
+import 'summary_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,278 +15,278 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  late AnimationController _mainController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-
   late List<AnimationController> _sectionControllers;
-  late List<Animation<Offset>> _sectionSlideAnimations;
-
-  final int _sectionCount = 3; // Кількість нових інформаційних секцій
 
   @override
   void initState() {
     super.initState();
-    _mainController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainController, curve: const Interval(0.0, 0.6, curve: Curves.easeIn)),
-    );
-
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(parent: _mainController, curve: const Interval(0.0, 0.7, curve: Curves.easeOutQuint)),
-    );
-    _mainController.forward();
-
-    _sectionControllers = List.generate(
-      _sectionCount,
-      (index) => AnimationController(vsync: this, duration: const Duration(milliseconds: 500)),
-    );
-
-    _sectionSlideAnimations = List.generate(
-      _sectionCount,
-      (index) => Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-        CurvedAnimation(parent: _sectionControllers[index], curve: Curves.easeOutCubic),
-      ),
-    );
-
-    // Запускаємо анімацію секцій послідовно (для демонстрації)
+    // 5 контролерів: 1 для Hero, 4 для Info
+    _sectionControllers = List.generate(5, (index) => AnimationController(vsync: this, duration: const Duration(milliseconds: 600)));
     _startSectionAnimations();
   }
 
   void _startSectionAnimations() async {
     for (int i = 0; i < _sectionControllers.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 250)); // Затримка між анімаціями секцій
-      if (mounted) {
-        _sectionControllers[i].forward();
-      }
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (mounted) _sectionControllers[i].forward();
     }
   }
 
   @override
   void dispose() {
-    _mainController.dispose();
     for (var controller in _sectionControllers) {
       controller.dispose();
     }
     super.dispose();
   }
 
-  Widget _buildInfoSection({
-    required IconData icon,
-    required String title,
-    required String text,
-    required Animation<Offset> slideAnimation,
-    required AnimationController controller, // ДОДАНО: приймаємо контролер
-    required ThemeData theme,
-  }) {
-    // Створюємо анімацію для прозорості, використовуючи переданий контролер
-    final Animation<double> fadeAnimationForSection = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: controller, // ЗМІНЕНО: використовуємо переданий контролер
-        curve: const Interval(0.5, 1.0, curve: Curves.easeIn), // Налаштуй інтервал, якщо потрібно
-      ),
-    );
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context)!;
 
-    return SlideTransition(
-      position: slideAnimation,
-      child: FadeTransition(
-        opacity: fadeAnimationForSection,
-        child: Card(
-          margin: const EdgeInsets.symmetric(vertical: 12.0),
-          elevation: 1.5,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(icon, size: 30, color: theme.colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  text,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    height: 1.5,
-                    color: theme.textTheme.bodyLarge?.color?.withAlpha((0.9 * 255).round()),
-                  ),
-                ),
-              ],
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(localizations.get('formafon'), style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: const [
+          _SettingsPopupButton(),
+          SizedBox(width: 8),
+        ],
+      ),
+      body: ListView(
+        // Прибираємо всі відступи зі списку, щоб дочірні елементи могли контролювати свою позицію
+        padding: EdgeInsets.zero,
+        children: [
+          const SizedBox(height: 20),
+          // Герой-секція має свої власні відступи
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: _AnimatedSection(
+              controller: _sectionControllers[0],
+              index: 0,
+              child: _HeroSection(),
             ),
           ),
+          const SizedBox(height: 20),
+          _AnimatedSection(
+            controller: _sectionControllers[1],
+            index: 1, // Непарний індекс - виїзд зліва
+            child: _InfoSection(
+              icon: Icons.extension_outlined,
+              title: localizations.get('what_is_formafon'),
+              text: localizations.get('what_is_formafon_desc'),
+              isLeftAligned: true,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AnimatedSection(
+            controller: _sectionControllers[2],
+            index: 2, // Парний індекс - виїзд справа
+            child: _InfoSection(
+              icon: Icons.verified_user_outlined,
+              title: localizations.get('why_us'),
+              text: localizations.get('why_us_desc'),
+              isLeftAligned: false,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AnimatedSection(
+            controller: _sectionControllers[3],
+            index: 3, // Непарний індекс - виїзд зліва
+            child: _InfoSection(
+              icon: Icons.integration_instructions_outlined,
+              title: localizations.get('how_it_works'),
+              text: localizations.get('how_it_works_desc'),
+              isLeftAligned: true,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AnimatedSection(
+            controller: _sectionControllers[4],
+            index: 4, // Парний індекс - виїзд справа
+            child: _InfoSection(
+              icon: Icons.alternate_email_rounded,
+              title: localizations.get('contact_us_title'),
+              text: localizations.get('contact_us_desc'),
+              isLeftAligned: false,
+            ),
+          ),
+          const SizedBox(height: 120),
+        ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: ElevatedButton.icon(
+          icon: const Icon(Icons.checklist_rtl_rounded, size: 20),
+          label: Text(localizations.get('summary_button')),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 52),
+          ),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SummaryScreen())),
         ),
       ),
     );
   }
+}
+
+class _AnimatedSection extends StatelessWidget {
+  final AnimationController controller;
+  final Widget child;
+  final int index;
+
+  const _AnimatedSection({
+    required this.controller,
+    required this.child,
+    required this.index,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (index == 0) { // Анімація для герой-секції
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: controller, curve: Curves.easeOut),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
+              .animate(CurvedAnimation(parent: controller, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+      );
+    }
+
+    // Анімація для інформаційних блоків
+    final beginOffset = (index.isOdd) ? const Offset(-1.0, 0) : const Offset(1.0, 0);
+
+    return SlideTransition(
+      position: Tween<Offset>(begin: beginOffset, end: Offset.zero)
+          .animate(CurvedAnimation(parent: controller, curve: Curves.easeInOutQuart)),
+      child: child,
+    );
+  }
+}
+
+class _HeroSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context)!;
+    
+    return Column(
+      children: [
+        Icon(Icons.phonelink_setup_rounded, size: 60, color: theme.primaryColor),
+        const SizedBox(height: 16),
+        Text(localizations.get('home_title'), textAlign: TextAlign.center, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(
+          localizations.get('home_subtitle'),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
+        ),
+        const SizedBox(height: 24),
+         ElevatedButton(
+            child: Text(localizations.get('create_button')),
+            onPressed: () {
+              Provider.of<ConfiguratorProvider>(context, listen: false).resetConfiguration();
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ConfiguratorScreen()));
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _InfoSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+  final bool isLeftAligned;
+
+  const _InfoSection({
+    required this.icon,
+    required this.title,
+    required this.text,
+    this.isLeftAligned = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120.0,
-            floating: false,
-            pinned: true,
-            backgroundColor: theme.scaffoldBackgroundColor.withAlpha((0.85 * 255).round()),
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: true,
-              titlePadding: const EdgeInsets.only(bottom: 16.0),
-              title: Text(
-                'FormaFon Lviv',
-                style: theme.appBarTheme.titleTextStyle,
+    
+    // FIX: Використовуємо Align, щоб притиснути блок до краю
+    return Align(
+      alignment: isLeftAligned ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        // FIX: Задаємо ширину в 70% від ширини екрану
+        width: MediaQuery.of(context).size.width * 0.7,
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.only(
+            topLeft: isLeftAligned ? Radius.zero : const Radius.circular(20),
+            bottomLeft: isLeftAligned ? Radius.zero : const Radius.circular(20),
+            topRight: isLeftAligned ? const Radius.circular(20) : Radius.zero,
+            bottomRight: isLeftAligned ? const Radius.circular(20) : Radius.zero,
+          ),
+          boxShadow: [ BoxShadow(color: theme.colorScheme.shadow.withOpacity(0.1), offset: const Offset(0, 4), blurRadius: 12) ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(icon, size: 24, color: theme.primaryColor),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8), height: 1.5)),
+                ],
               ),
             ),
-          ),
-          SliverList(
-            delegate: SliverChildListDelegate(
-              [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(30.0, 20.0, 30.0, 30.0),
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          ScaleTransition(
-                            scale: CurvedAnimation(parent: _mainController, curve: Curves.elasticOut, reverseCurve: Curves.elasticIn),
-                            child: Icon(
-                              Icons.phonelink_setup_rounded,
-                              size: 100,
-                              color: theme.colorScheme.primary,
-                              shadows: [
-                                BoxShadow(
-                                  color: theme.colorScheme.primary.withAlpha((0.4 * 255).round()),
-                                  blurRadius: 20,
-                                  spreadRadius: 1
-                                )
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Твій Телефон – Твої Правила!',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                                  color: theme.textTheme.titleLarge?.color,
-                                  fontWeight: FontWeight.w600
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Створи унікальний смартфон, що ідеально відповідає твоїм потребам. Обери компоненти – ми професійно зберемо його у Львові!',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
-                          ),
-                          const SizedBox(height: 40),
-                          AnimatedBuilder(
-                            animation: _mainController,
-                            builder: (context, child) => Transform.scale(
-                              scale: 0.85 + (_mainController.value * 0.15),
-                              child: child,
-                            ),
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.rocket_launch_outlined, size: 24),
-                              label: const Text('Створити Свій FormaFon'),
-                              style: theme.elevatedButtonTheme.style,
-                              onPressed: () {
-                                Provider.of<ConfiguratorProvider>(context, listen: false).resetConfiguration();
-                                Navigator.push(
-                                  context,
-                                  PageRouteBuilder(
-                                    pageBuilder: (context, animation, secondaryAnimation) => const ConfiguratorScreen(),
-                                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                      const begin = Offset(0.0, 1.0);
-                                      const end = Offset.zero;
-                                      const curve = Curves.easeOutExpo;
-                                      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                      return SlideTransition(
-                                        position: animation.drive(tween),
-                                        child: FadeTransition(opacity: animation, child: child),
-                                      );
-                                    },
-                                    transitionDuration: const Duration(milliseconds: 450),
-                                  )
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 30),
-                          Divider(color: Colors.grey.shade300, indent: 40, endIndent: 40),
-                          const SizedBox(height: 30),
-
-                          // Нові інформаційні секції
-                          _buildInfoSection(
-                            theme: theme,
-                            icon: Icons.extension_outlined,
-                            title: 'Що таке FormaFon?',
-                            text: 'FormaFon – це унікальний сервіс у Львові, який дозволяє тобі стати архітектором власного смартфона! Ти обираєш кожен компонент, від процесора до дизайну корпусу, а наші досвідчені майстри збирають його для тебе. Отримай пристрій, що на 100% відповідає твоїм потребам та стилю.',
-                            slideAnimation: _sectionSlideAnimations[0],
-                            controller: _sectionControllers[0], // ПЕРЕДАЄМО КОНТРОЛЕР
-                          ),
-                          _buildInfoSection(
-                            theme: theme,
-                            icon: Icons.verified_user_outlined,
-                            title: 'Чому Обирають Нас?',
-                            text: '• Повний Контроль: Ти вирішуєш все.\n• Приватність: Обирай ОС та компоненти без шпигунського ПЗ.\n• Якість: Професійна збірка у Львові з перевірених деталей.\n• Унікальність: Твій телефон буде єдиним у своєму роді.\n• Підтримка: Ми завжди готові допомогти з твоїм FormaFon.',
-                            slideAnimation: _sectionSlideAnimations[1],
-                            controller: _sectionControllers[1], // ПЕРЕДАЄМО КОНТРОЛЕР
-                          ),
-                           _buildInfoSection(
-                            theme: theme,
-                            icon: Icons.integration_instructions_outlined,
-                            title: 'Як Це Працює?',
-                            text: '1. Конфігуруй: Використовуй наш інтуїтивний онлайн-конструктор.\n2. Замовляй: Підтверди свою унікальну конфігурацію.\n3. Ми Збираємо: Наші майстри у Львові створюють твій телефон.\n4. Насолоджуйся: Отримай персональний гаджет мрії!',
-                            slideAnimation: _sectionSlideAnimations[2],
-                            controller: _sectionControllers[2], // ПЕРЕДАЄМО КОНТРОЛЕР
-                          ),
-                          const SizedBox(height: 40),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.checklist_rtl_rounded, size: 24),
-          label: const Text('Переглянути Підсумок'),
-          style: theme.elevatedButtonTheme.style,
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SummaryScreen()),
-            );
-          },
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _SettingsPopupButton extends StatelessWidget {
+  const _SettingsPopupButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = Provider.of<SettingsProvider>(context);
+    final localizations = AppLocalizations.of(context)!;
+
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        if (value == 'theme') {
+          settings.toggleTheme();
+        } else if (value == 'language') {
+          final newLocale = settings.locale.languageCode == 'uk' ? const Locale('en') : const Locale('uk');
+          settings.setLocale(newLocale);
+        }
+      },
+      icon: Icon(Icons.more_vert_rounded, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'theme',
+          child: ListTile(
+            leading: Icon(settings.isDarkMode ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+            title: Text(localizations.get('toggle_theme_tooltip')),
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'language',
+          child: ListTile(
+            leading: const Icon(Icons.language_outlined),
+            title: Text(localizations.get('toggle_language_tooltip')),
+          ),
+        ),
+      ],
     );
   }
 }
